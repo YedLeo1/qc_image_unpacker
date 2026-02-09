@@ -17,23 +17,27 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y build-essential git
+          sudo apt install -y build-essential
 
       - name: Setup Android NDK r27b
+        id: setup_ndk
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r27b
-          add-to-path: false
 
-      - name: Cross-compile for Android (arm64-v8a / x86 / x86_64)
+      - name: Build for Android
         run: |
           chmod +x make.sh
+          # 脚本要的是 NDK，不是 ANDROID_NDK，所以必须这样写
+          export NDK="${{ steps.setup_ndk.outputs.ndk-path }}"
+          echo "NDK=$NDK"
           ./make.sh cross-android
         env:
-          ANDROID_NDK: ${{ env.ANDROID_NDK }}
+          # 双重保险
+          NDK: ${{ steps.setup_ndk.outputs.ndk-path }}
 
-      - name: Upload built binaries
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: qc_image_unpacker-android-all
+          name: qc_image_unpacker-android
           path: bin/
