@@ -1,53 +1,46 @@
-name: Build qc_image_unpacker for Android
+name: Build qc_image_unpacker Android
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
     branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # 防止卡死
     strategy:
       matrix:
-        arch:
-          - arm64-v8a
-          - armeabi-v7a
-          - x86_64
+        arch: [arm64-v8a]
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y build-essential cmake git wget unzip
+        run: sudo apt update && sudo apt install -y build-essential cmake
 
+      # 用官方 NDK 安装动作，比自己 wget 稳定太多
       - name: Setup Android NDK
-        run: |
-          wget -O ndk.zip https://dl.google.com/android/repository/android-ndk-r27b-linux.zip
-          unzip -q ndk.zip
-          echo "ANDROID_NDK_HOME=$GITHUB_WORKSPACE/android-ndk-r27b" >> $GITHUB_ENV
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27b
+          add-to-path: false
 
-      - name: Build for ${{ matrix.arch }}
+      - name: Build ${{ matrix.arch }}
         run: |
-          mkdir -p build-${{ matrix.arch }}
-          cd build-${{ matrix.arch }}
-
+          mkdir build && cd build
           cmake .. \
             -DCMAKE_SYSTEM_NAME=Android \
             -DCMAKE_SYSTEM_VERSION=24 \
             -DCMAKE_ANDROID_ARCH_ABI=${{ matrix.arch }} \
-            -DCMAKE_ANDROID_NDK=$ANDROID_NDK_HOME \
+            -DCMAKE_ANDROID_NDK=$ANDROID_NDK \
             -DCMAKE_BUILD_TYPE=Release
-
           make -j$(nproc)
+          strip qc_image_unpacker  # 减小体积
 
-      - name: Upload artifact
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: qc_image_unpacker-android-${{ matrix.arch }}
-          path: build-${{ matrix.arch }}/qc_image_unpacker
+          name: qc_image_unpacker-${{ matrix.arch }}
+          path: build/qc_image_unpacker
